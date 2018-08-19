@@ -9,8 +9,10 @@ class DQNAgent(nn.Module):
     def __init__(self, state_shape, n_actions, epsilon=0):
         """A simple DQN agent"""
         if torch.cuda.is_available():
+            print('Using cuda')
             self.device = torch.device('cuda')
         else:
+            print('using cpu')
             self.device = torch.device('cpu')
         nn.Module.__init__(self)
         self.epsilon = epsilon

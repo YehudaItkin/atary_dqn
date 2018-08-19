@@ -189,11 +189,15 @@ def main(args):
         if i % 500 == 0:
             # Load agent weights into target_network
             target_network.load_state_dict(agent.state_dict())
+            torch.save(agent.state_dict(), 'model_{}'.format(args.name))
 
         if i % 500 == 0:
+            eps = agent.epsilon
+            agent.epsilon = 0
             env_monitor = gym.wrappers.Monitor(make_env(), directory="videos", force=True)
             [evaluate(env_monitor, agent, n_games=1) for _ in range(100)]
             env_monitor.close()
+            agent.epsilon = eps
 
         if i % 100 == 0:
             with open('{}_mean_reward.pickle'.format(args.name), 'wb') as f:
