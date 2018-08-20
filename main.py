@@ -1,5 +1,6 @@
 import argparse
 import pickle
+import time
 
 from gym.core import ObservationWrapper
 from gym.spaces import Box
@@ -56,12 +57,18 @@ def evaluate(env, agent, n_games=1, greedy=False, t_max=10000):
     for _ in range(n_games):
         s = env.reset()
         reward = 0
-        for _ in range(t_max):
+        i = 0
+        while True:
             qvalues = agent.get_qvalues([s])
             action = qvalues.argmax(axis=-1)[0] if greedy else agent.sample_actions(qvalues)[0]
             s, r, done, _ = env.step(action)
             reward += r
-            if done: break
+            i += 1
+            if done:
+                break
+            if i > t_max:
+                print('i > t_max something wrong')
+                break
 
         rewards.append(reward)
     return np.mean(rewards)
@@ -87,16 +94,23 @@ def play_and_record(agent, env, exp_replay, n_steps=1):
     # initial state
     obs = env.reset()
     rewards = []
-    for _ in range(n_steps):
+    i = 0
+    while True:
+        i += 1
         qvalues = agent.get_qvalues([obs])
         action = agent.sample_actions(qvalues)[0]
         next_obs, r, done, _ = env.step(action)
         exp_replay.add(obs, action, r, next_obs, done)
         rewards.append(r)
-        if done:
+        if done and i <= n_steps:
             obs = env.reset()
-        else:
+        elif done and i > n_steps:
+            env.reset()
+            break
+        elif not done:
             obs = next_obs
+        else:
+            assert 'You sholdnt be here'
 
     return np.mean(rewards)
 
@@ -187,15 +201,15 @@ def main(args):
             mean_rw_history.append(evaluate(make_env(), agent, n_games=3))
 
         if i % 500 == 0:
+            t = time.time()
             # Load agent weights into target_network
             target_network.load_state_dict(agent.state_dict())
-            torch.save(agent.state_dict(), 'model_{}'.format(args.name))
+            torch.save(agent.state_dict(), 'model_{}_{}.weights'.format(args.name, t))
 
-        if i % 500 == 0:
             eps = agent.epsilon
             agent.epsilon = 0
-            env_monitor = gym.wrappers.Monitor(make_env(), directory="videos", force=True)
-            [evaluate(env_monitor, agent, n_games=1) for _ in range(100)]
+            env_monitor = gym.wrappers.Monitor(make_env(), directory="videos_{}".format(t), force=True)
+            evaluate(env_monitor, agent, n_games=1)
             env_monitor.close()
             agent.epsilon = eps
 
